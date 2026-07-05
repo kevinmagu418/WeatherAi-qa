@@ -10,9 +10,9 @@
 
 - **Date(s) tested:** 2026-07-05 (infrastructure probe only — see below); full authenticated run still _TBD_
 - **API key tier:** _TBD (Free, per assessment scope)_ — no working key obtained yet (see §4)
-- **Endpoints tested:** `GET /v1/weather`, `GET /v1/forecast`, `GET /v1/usage`
-- **Test suites run:** `tests/weather.test.js`, `tests/forecast.test.js`, `tests/usage.test.js`, `postman/weatherai-qa.postman_collection.json` — not yet run in full; unauthenticated cases (WX-010, WX-080, WX-092) were run manually and are reported below because they required no API key
-- **Total automated test cases:** 58 live/API cases (38 in `weather.test.js`, 17 in `forecast.test.js`, 3 in `usage.test.js`) + 9 isolated unit tests for internal helpers (`tests/helpers/retry.test.js`, `tests/helpers/usageDiff.test.js`) — see `TEST_PLAN.md` §4 for the full list
+- **Endpoints tested (in scope this pass):** `GET /v1/weather`, `GET /v1/usage`. (`GET /v1/forecast` has a standalone bonus suite from an earlier pass — see `TEST_PLAN.md` § "Out of scope.")
+- **Test suites run:** `tests/weather.test.js`, `tests/usage.test.js`, `postman/weatherai-qa.postman_collection.json` — not yet run in full; unauthenticated cases (WX-010, WX-080, WX-092) were run manually and are reported below because they required no API key
+- **Total automated test cases:** 41 live/API cases in scope this pass (38 in `weather.test.js`, 3 in `usage.test.js`) + 9 isolated unit tests for internal helpers (`tests/helpers/retry.test.js`, `tests/helpers/usageDiff.test.js`). An additional 17 cases exist in `forecast.test.js` as bonus, out-of-scope coverage. See `TEST_PLAN.md` §4 for the full list.
 - **Overall result:** _TBD — full suite blocked pending a working key and a responsive backend (see Finding below)_
 
 ## 2. Key findings
@@ -46,7 +46,7 @@
 
 ### Finding: _template — replace with real finding once authenticated tests can run_
 - **Severity:** _Critical / High / Medium / Low_
-- **Where:** `GET /v1/weather` or `/v1/forecast`, specific param/case
+- **Where:** `GET /v1/weather` or `GET /v1/usage`, specific param/case
 - **Description:** _What happened, with the exact request and response._
 - **Impact:** _Who is affected and how._
 - **Recommendation:** _Concrete fix or mitigation._

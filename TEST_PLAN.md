@@ -4,21 +4,20 @@
 
 ### In scope
 - **`GET /v1/weather`** — primary target. Current conditions + multi-day forecast for a given `lat`/`lon`. Query params exactly as documented: `lat` (float, required), `lon` (float, required), `days` (int, optional, 1-7 Free / 1-14 Pro / 1-16 Scale, default 7), `ai` (bool, optional, default `true`), `units` (`metric`|`imperial`, default `metric`), `lang` (e.g. `en`/`sw`, default `en`).
-- **`GET /v1/forecast`** — documented as a convenience alias of `/v1/weather` accepting identical parameters. Covered as a secondary target, including a parity check against `/v1/weather`.
-- **`GET /v1/usage`** — secondary target, added this pass. No query params. Used both for its own contract (200/401/shape) and as ground truth for verifying `ai=false` vs `ai=true` quota accounting on `/v1/weather`.
+- **`GET /v1/usage`** — secondary target. No query params. Used both for its own contract (200/401/shape) and as ground truth for verifying `ai=false` vs `ai=true` quota accounting on `/v1/weather`.
 - Functional correctness, negative/input validation, boundary conditions, response consistency, rate-limit header correctness, error-response quality/consistency, and the full documented error-code matrix (401/403/429/400/500/503).
 
 ### Out of scope (and why)
 | Endpoint / area | Reason excluded |
 |---|---|
+| `/v1/forecast`, `/v1/current`, `/v1/daily`, `/v1/hourly`, `/v1/weather-geo` | Same param family as `/v1/weather` (documented as delegating to the same underlying handler, or in `/v1/forecast`'s case an explicit convenience alias), but not in scope for this pass — flagged as stretch goals per current instructions. **Note:** an earlier pass already built a full `tests/forecast.test.js` suite (17 cases) treating `/v1/forecast` as an in-scope secondary target; that suite is left in the repo as pre-existing bonus coverage and still runs (`npm run test:forecast`), but it is no longer part of this pass's required/maintained scope and isn't reflected in the test-case table below. |
 | `/v1/forecast14` | Pro+/Scale-gated extended forecast. The assessment key is Free tier; this would only ever return the plan-gating error, which is exercised generically via `/v1/weather?days=14/16` (WX-032/WX-033). |
 | `/v1/insights` | Pro+ only (enhanced AI analysis with agronomic context). Not accessible on a Free key. |
 | `/v1/ip-lookup` | Pro+ only (IP → geo/timezone resolution). Not accessible on a Free key. |
 | `/v1/webhooks` | Pro+ only. Not accessible on a Free key, and webhook delivery testing (needing a public callback URL) is a different test shape than request/response QA. |
 | `/v1/sms/*` | Requires a Scale plan **and** compliance approval for SMS delivery. Neither is available to this assessment's account, and triggering real SMS sends isn't appropriate for automated QA regardless. |
-| `/v1/trees/analyze` and related image-analysis endpoints | Multipart image upload is a materially different test shape (file fixtures, content-type negotiation, binary response handling) from the query-param JSON endpoints covered here. Flagged as a good stretch goal for a follow-up pass, not built out in this round. |
+| `/v1/trees/*` (image-analysis endpoints) | Multipart image upload is a materially different test shape (file fixtures, content-type negotiation, binary response handling) from the query-param JSON endpoints covered here. Out of scope for this pass. |
 | Firebase callable functions (`cancelSubscription`, `requestSmsAccess`, etc.) | Not plain REST — they require a Firebase Auth session rather than the `Authorization: Bearer wai_*` scheme this suite is built around. Out of scope for REST API QA; would need a separate Firebase-aware test harness. |
-| `/v1/current`, `/v1/daily`, `/v1/hourly`, `/v1/weather-geo` | Documented as delegating to the same underlying handler as `/v1/weather`. Candidates for a follow-up pass once the primary endpoints are fully verified; not exercised this round given the time budget. |
 | Load/performance testing beyond header inspection | The Free tier is capped at 1,000 requests/month and 200 AI requests/month. Deliberately generating volume to measure latency under load would burn the assessment's only API key. See §3 "Rate limiting" and the WX-090 test for how 429 is exercised safely instead. |
 | Third-party weather-data accuracy (is 24.5°C "correct" for Nairobi right now?) | Not testable without an independent ground-truth source, and outside the scope of API-contract QA. |
 
@@ -26,20 +25,21 @@
 
 | Type | What it checks | Where |
 |---|---|---|
-| Functional / happy path | Valid inputs return 200 with correct schema, types, and units | `tests/weather.test.js`, `tests/forecast.test.js`, `tests/usage.test.js` |
-| Negative — auth | Missing/malformed/invalid credentials are rejected consistently | all three suites |
-| Negative — params | Missing/invalid/out-of-range query params are rejected consistently | `weather.test.js`, `forecast.test.js` |
-| Boundary | Exact coordinate limits (±90 lat, ±180 lon), equator, high-precision decimals | `weather.test.js`, `forecast.test.js` |
+| Functional / happy path | Valid inputs return 200 with correct schema, types, and units | `tests/weather.test.js`, `tests/usage.test.js` |
+| Negative — auth | Missing/malformed/invalid credentials are rejected consistently | `weather.test.js`, `usage.test.js` |
+| Negative — params | Missing/invalid/out-of-range query params are rejected consistently | `weather.test.js` |
+| Boundary | Exact coordinate limits (±90 lat, ±180 lon), equator, high-precision decimals | `weather.test.js` |
 | Plan-gating / quota | Free-tier `days` limits, and whether `ai=false` truly avoids the AI-specific quota counter | `weather.test.js` (WX-032/033), `usage.test.js` (UG-010) |
-| Consistency | Repeated identical requests return structurally stable data | `weather.test.js`, `forecast.test.js` |
+| Consistency | Repeated identical requests return structurally stable data | `weather.test.js` |
 | Rate limiting | `X-RateLimit-*` headers are present, well-formed, decrement correctly, and a real 429 is observed when quota is genuinely low | `weather.test.js` |
 | Documented error-code mapping | Each of the six documented codes (401/403/429/400/500/503) is exercised or its non-forceability explicitly documented | `weather.test.js` |
-| Error-response quality | Every error path returns valid JSON, a consistent `{error, message}` shape, and a status code ≥ 400 (never a 200 with an error hidden in the body) | all three suites |
+| Error-response quality | Every error path returns valid JSON, a consistent `{error, message}` shape, and a status code ≥ 400 (never a 200 with an error hidden in the body) | `weather.test.js`, `usage.test.js` |
 | Helper unit tests (not live API calls) | The retry/backoff mechanism and the usage-diff heuristic behave correctly in isolation | `tests/helpers/retry.test.js`, `tests/helpers/usageDiff.test.js` |
+| _(Bonus, out of this pass's scope)_ | `/v1/forecast` happy path, negatives, boundary, consistency, rate-limit, error-quality, plus an alias-parity check against `/v1/weather` | `tests/forecast.test.js` — kept from an earlier pass, not required or actively maintained this round |
 
 ## 3. Tools used and why
 
-- **Jest + Supertest** — automated regression suite, runs against the real `https://api.weather-ai.co` base URL (no localhost/mocking). Chosen because it's fast to write, gives clear pass/fail output for a CI-style run, and Supertest's fluent API keeps HTTP assertions readable. Independently runnable per file (`npm run test:weather`, `npm run test:forecast`, `npm run test:usage`) so a reviewer can run just one endpoint's suite.
+- **Jest + Supertest** — automated regression suite, runs against the real `https://api.weather-ai.co` base URL (no localhost/mocking). Chosen because it's fast to write, gives clear pass/fail output for a CI-style run, and Supertest's fluent API keeps HTTP assertions readable. Independently runnable per file (`npm run test:weather`, `npm run test:usage`) so a reviewer can run just one endpoint's suite. (`npm run test:forecast` still exists as bonus coverage — see §1 "Out of scope".)
 - **Postman** — exploratory and manual verification, mirroring the same test categories with `pm.test(...)` assertions. Useful for ad-hoc probing (e.g. trying an unexpected param combination while reading the docs side-by-side) and for a non-engineer reviewer to click through requests without reading code.
 - **dotenv** — loads `WEATHERAI_API_KEY` / `WEATHERAI_BASE_URL` from `.env` so no secret is ever hardcoded or committed.
 - **`tests/helpers/retry.js`** — a small exponential-backoff wrapper used to exercise the documented "500 → client should retry with backoff" contract. A real 500 can't be forced on demand, so the mechanism is unit-tested in isolation (`retry.test.js`, mocked, no network) and also wrapped around live calls in WX-091/WX-092 to record whatever the API actually does.
@@ -100,7 +100,9 @@ Legend: **Category** — F=Functional, A=Auth-negative, P=Param-negative, B=Boun
 | WX-080 | `/v1/weather` | Missing auth + missing `lat` simultaneously | E | Status ≥ 400, never 200 | **Observed 2026-07-05: 503 instead — see REPORT.md** |
 | WX-081 | `/v1/weather` | 401 / 400 (missing param) / 400 (out-of-range) fired together | E | All three: status ≥ 400, `Content-Type: application/json`, `{error, message}` shape | PENDING — awaiting API key |
 
-### `/v1/forecast` (`tests/forecast.test.js`)
+### `/v1/forecast` (`tests/forecast.test.js`) — bonus coverage, out of scope for this pass
+
+Kept from an earlier pass when `/v1/forecast` was treated as an in-scope secondary target; not required or actively maintained under the current scope (see §1 "Out of scope"), but the suite still runs standalone via `npm run test:forecast`. Listed here for completeness/transparency rather than deleting working coverage.
 
 | ID | Endpoint | Description | Category | Expected result (per docs) | Actual result |
 |---|---|---|---|---|---|
@@ -133,14 +135,14 @@ Legend: **Category** — F=Functional, A=Auth-negative, P=Param-negative, B=Boun
 
 | Code | Meaning (per docs) | How it's exercised | Test ID(s) |
 |---|---|---|---|
-| 401 | Missing/malformed/revoked API key | Deterministic — no/garbage/malformed auth header | WX-010–014, FC-010–012, UG-002 |
+| 401 | Missing/malformed/revoked API key | Deterministic — no/garbage/malformed auth header | WX-010–014, UG-002 (also FC-010–012 in the bonus, out-of-scope forecast suite) |
 | 403 | Plan doesn't include the requested feature | Best available trigger: `days=14`/`days=16` on a Free key. **Not documented whether this actually returns 403** — see WX-032/033 | WX-032, WX-033 |
 | 429 | Monthly quota exceeded | Conditional — only actually triggered if `X-RateLimit-Remaining ≤ 5`, to avoid burning a healthy key's quota | WX-090 |
-| 400 | Missing required params (`lat`/`lon`) | Deterministic — omit/invalidate required params | WX-020–030, WX-022, FC-020–025 |
+| 400 | Missing required params (`lat`/`lon`) | Deterministic — omit/invalidate required params | WX-020–030, WX-022 (also FC-020–025 in the bonus forecast suite) |
 | 500 | Server-side issue; client should retry with backoff | Cannot be forced; retry/backoff mechanism unit-tested in isolation, then wrapped around a live call to record the real outcome | WX-091, `tests/helpers/retry.test.js` |
 | 503 | Dependency unreachable | Cannot be forced; same retry-wrapped approach as 500. **Already observed live** during this assessment (edge/CDN-level, HTML body) — see REPORT.md | WX-092 |
 
-Postman collection (`postman/weatherai-qa.postman_collection.json`) mirrors the highest-value cases from the tables above (happy path, auth negatives, param negatives, boundary, consistency, rate-limit headers, error quality) for manual/exploratory use. It has not yet been updated with the 403/429/500/503/usage cases added in this pass — flagged as a follow-up.
+Postman collection (`postman/weatherai-qa.postman_collection.json`) mirrors the highest-value `/v1/weather` cases (happy path, auth negatives, param negatives, boundary, consistency, rate-limit headers, error quality) for manual/exploratory use. It has not yet been updated with the 403/429/500/503/usage cases added in recent passes — flagged as a follow-up.
 
 ## 5. Assumptions
 

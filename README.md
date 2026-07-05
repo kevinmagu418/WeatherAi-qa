@@ -1,8 +1,11 @@
 # WeatherAI QA Assessment
 
 QA test plan, automated test suite, and Postman collection for the [WeatherAI
-developer API](https://weather-ai.co/docs), covering `GET /v1/weather`,
-`GET /v1/forecast`, and `GET /v1/usage`.
+developer API](https://weather-ai.co/docs). Current scope: `GET /v1/weather`
+(primary) and `GET /v1/usage` (secondary, incl. AI-quota accounting).
+`GET /v1/forecast` has a standalone suite left over from an earlier pass —
+see `TEST_PLAN.md` § "Out of scope" for why it's now a bonus/stretch item
+rather than required scope.
 
 - **`TEST_PLAN.md`** — scope, testing types, tools, and the full test case list.
 - **`REPORT.md`** — findings and recommendations from the live test run (see status note at the top of that file).
@@ -32,11 +35,11 @@ WEATHERAI_API_KEY=wai_your_real_key_here
 ## Running the tests
 
 ```bash
-npm test              # full suite (weather + forecast + usage + helper unit tests)
-npm run test:weather  # /v1/weather only
-npm run test:forecast # /v1/forecast only
-npm run test:usage    # /v1/usage only
+npm test              # full suite (weather + usage + helper unit tests + bonus forecast suite)
+npm run test:weather  # /v1/weather only -- primary scope
+npm run test:usage    # /v1/usage only -- secondary scope
 npm run test:unit     # tests/helpers/*.test.js only -- no network calls, safe to run anytime
+npm run test:forecast # /v1/forecast only -- bonus coverage, not required this pass
 ```
 
 Tests hit the live API at `https://api.weather-ai.co` (override with
