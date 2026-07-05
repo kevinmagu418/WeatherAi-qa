@@ -8,6 +8,8 @@
     "test": "jest --runInBand",
     "test:weather": "jest tests/weather.test.js --runInBand",
     "test:forecast": "jest tests/forecast.test.js --runInBand",
+    "test:usage": "jest tests/usage.test.js --runInBand",
+    "test:unit": "jest tests/helpers --runInBand",
     "test:watch": "jest --watch"
   },
   "dependencies": {
