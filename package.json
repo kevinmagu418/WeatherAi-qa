@@ -1,0 +1,23 @@
+{
+  "name": "weatherai-qa-assessment",
+  "version": "1.0.0",
+  "description": "QA test plan and automated test suite for the WeatherAI developer API",
+  "private": true,
+  "type": "commonjs",
+  "scripts": {
+    "test": "jest --runInBand",
+    "test:weather": "jest tests/weather.test.js --runInBand",
+    "test:forecast": "jest tests/forecast.test.js --runInBand",
+    "test:watch": "jest --watch"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "supertest": "^7.0.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
