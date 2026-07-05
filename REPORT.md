@@ -10,9 +10,9 @@
 
 - **Date(s) tested:** 2026-07-05 (infrastructure probe only — see below); full authenticated run still _TBD_
 - **API key tier:** _TBD (Free, per assessment scope)_ — no working key obtained yet (see §4)
-- **Endpoints tested:** `GET /v1/weather`, `GET /v1/forecast`
-- **Test suites run:** `tests/weather.test.js`, `tests/forecast.test.js`, `postman/weatherai-qa.postman_collection.json` — not yet run in full; one unauthenticated case (WX-010) was run manually and is reported below because it required no API key
-- **Total automated test cases:** 49 (32 in `weather.test.js`, 17 in `forecast.test.js` — see `TEST_PLAN.md` §4 for the full list)
+- **Endpoints tested:** `GET /v1/weather`, `GET /v1/forecast`, `GET /v1/usage`
+- **Test suites run:** `tests/weather.test.js`, `tests/forecast.test.js`, `tests/usage.test.js`, `postman/weatherai-qa.postman_collection.json` — not yet run in full; unauthenticated cases (WX-010, WX-080, WX-092) were run manually and are reported below because they required no API key
+- **Total automated test cases:** 58 live/API cases (38 in `weather.test.js`, 17 in `forecast.test.js`, 3 in `usage.test.js`) + 9 isolated unit tests for internal helpers (`tests/helpers/retry.test.js`, `tests/helpers/usageDiff.test.js`) — see `TEST_PLAN.md` §4 for the full list
 - **Overall result:** _TBD — full suite blocked pending a working key and a responsive backend (see Finding below)_
 
 ## 2. Key findings
@@ -34,6 +34,7 @@
   ```
   By contrast, `https://weather-ai.co/docs` (marketing/docs site, different host) returns `200` normally — so this is isolated to the API backend, not a whole-company outage.
 - **Impact:** The API is completely unusable for any customer right now, authenticated or not. This also plausibly explains the "internal server error" encountered generating a key from the dashboard (see next finding) — if the dashboard's backend calls the same infrastructure, a down API would surface exactly that symptom. This blocked the full authenticated test run for this assessment.
+- **Test coverage:** WX-010 (auth-negative probe), WX-080 (error-quality probe), and WX-092 (the dedicated 503-mapping test, which explicitly branches on `Content-Type` to distinguish this infra-level failure from an application-level 503) all independently reproduced this — see `TEST_PLAN.md` §4 for how each is designed to keep recording this if it recurs.
 - **Recommendation:** Investigate backend/origin health behind the CDN (Fastly) for `api.weather-ai.co` as a priority — this reads as an infra/deploy issue rather than an application bug. Once restored, add uptime monitoring + alerting on the API host distinct from the marketing site, since the two are clearly on separate infrastructure and one can be up while the other is down without anyone noticing from the docs site alone.
 
 ### Finding: API key generation fails with an internal server error
@@ -57,13 +58,14 @@ _(Add one entry per confirmed issue found during the live run. Delete this templ
 > Fill in after the live run. Seed ideas to evaluate once real data is available:
 - Confirm error responses consistently use the documented `{error, message}` shape across *all* failure modes (some APIs drift on edge cases like 500s or malformed query strings).
 - Confirm `X-RateLimit-Reset` is actually a rolling 30-day window as documented, not silently a calendar month (would need multi-day observation to fully verify — noted as a testing limitation for a single 48-hour window).
-- Consider documenting explicit behavior for `days` values outside the plan's allowed range (400 vs. clamping) — currently ambiguous from the docs alone (see WX-031).
+- **Document the `days` overflow behavior explicitly.** The docs state per-plan limits (Free 1-7, Pro 1-14, Scale 1-16) but never say what happens when a Free key requests `days=14` or `days=16` — 400, 403, or silent clamping are all plausible and none is documented. WX-031/032/033 are written to record whichever actually happens; if it turns out to be silent clamping with a 200 (i.e. the caller asked for 16 days and got 7 back with no indication anything was capped), that's a real integration hazard worth flagging as at least a Medium finding once observed.
+- **Publish a `/v1/usage` response schema.** The docs describe this endpoint only in prose with no field names or example JSON — the only Free/Pro/Scale-tier endpoint without one. This forced the test suite to verify AI-quota accounting structurally (diffing numeric fields across snapshots) rather than asserting a concrete field name; a published schema would let integrators (and this suite) assert exact fields with confidence.
 
 ## 4. Blockers encountered during testing
 
 - **`api.weather-ai.co` returning 503 on every route (see Finding above).** Confirmed independently of the key issue, since it reproduces with zero auth. This blocks the *entire* authenticated test matrix, not just the parts that need a key.
 - **API key generation error on the dashboard (see Finding above).** This blocked key acquisition during the initial assessment window.
-- Net effect: the full 49-case automated suite and the Postman collection are written and ready (see `TEST_PLAN.md` §4), but could not be executed end-to-end because the API itself was unreachable at time of writing. All test code, the Postman collection, and this report's structure were completed against the documented API contract (https://weather-ai.co/docs) so that testing can proceed immediately once the backend and key issuance are both restored.
+- Net effect: the full 58-case automated suite (plus 9 isolated unit tests for internal helpers) and the Postman collection are written and ready (see `TEST_PLAN.md` §4), but could not be executed end-to-end because the API itself was unreachable at time of writing. All test code and this report's structure were completed against the documented API contract (https://weather-ai.co/docs) so that testing can proceed immediately once the backend and key issuance are both restored. Note the Postman collection has not yet been updated with the newer 403/429/500/503/usage cases added in this pass — flagged as a follow-up in `TEST_PLAN.md`.
 - _(Add any additional blockers encountered during the live run, e.g. unexpected auth behavior, undocumented required headers, CORS issues if relevant, etc.)_
 
 ## 5. How to reproduce
