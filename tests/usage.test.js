@@ -11,21 +11,25 @@
  * UG-010 proves the ai=true/false quota split described in the docs
  * ("ai=false ... preserve AI quota") without hardcoding a guessed field name
  * for the AI counter -- see tests/helpers/usageDiff.js for why.
+ *
+ * No-key behavior: same as weather.test.js -- every describe block is
+ * gated on `hasApiKey` and skips (not fails) when no key is configured.
  */
 
-const { api, authHeader } = require("./helpers/apiClient");
+const { api, authHeader, hasApiKey } = require("./helpers/apiClient");
 const { assertErrorShape } = require("./helpers/assertions");
 const { diffNumericLeaves } = require("./helpers/usageDiff");
 
 const ENDPOINT = "/v1/usage";
 const WEATHER_ENDPOINT = "/v1/weather";
 const VALID_PARAMS = { lat: -1.2921, lon: 36.8219 };
+const maybeDescribe = hasApiKey ? describe : describe.skip;
 
 function getUsage() {
   return api().get(ENDPOINT).set("Authorization", authHeader());
 }
 
-describe("GET /v1/usage - happy path", () => {
+maybeDescribe("GET /v1/usage - happy path", () => {
   test("UG-001: valid auth returns 200 with a non-empty JSON object", async () => {
     const res = await getUsage();
 
@@ -47,7 +51,7 @@ describe("GET /v1/usage - happy path", () => {
   });
 });
 
-describe("GET /v1/usage - auth negative cases", () => {
+maybeDescribe("GET /v1/usage - auth negative cases", () => {
   test("UG-002: missing Authorization header returns 401", async () => {
     const res = await api().get(ENDPOINT);
 
@@ -56,7 +60,7 @@ describe("GET /v1/usage - auth negative cases", () => {
   });
 });
 
-describe("GET /v1/usage - AI quota accounting (cross-endpoint)", () => {
+maybeDescribe("GET /v1/usage - AI quota accounting (cross-endpoint)", () => {
   // Strategy: snapshot /v1/usage, make one /v1/weather call with ai=false,
   // snapshot again, make one call with ai=true, snapshot again. Each window
   // contains exactly one weather call plus the /v1/usage check itself, so

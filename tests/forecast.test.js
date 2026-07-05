@@ -8,15 +8,19 @@
  * check confirming the alias behaves as documented.
  *
  * Independently runnable: `npm run test:forecast`.
+ *
+ * No-key behavior: same as weather.test.js -- every describe block is
+ * gated on `hasApiKey` and skips (not fails) when no key is configured.
  */
 
-const { api, authHeader } = require("./helpers/apiClient");
+const { api, authHeader, hasApiKey } = require("./helpers/apiClient");
 const { assertValidWeatherSchema, assertErrorShape } = require("./helpers/assertions");
 
 const ENDPOINT = "/v1/forecast";
 const VALID_PARAMS = { lat: -1.2921, lon: 36.8219 };
+const maybeDescribe = hasApiKey ? describe : describe.skip;
 
-describe("GET /v1/forecast - happy path", () => {
+maybeDescribe("GET /v1/forecast - happy path", () => {
   test("FC-001: valid lat/lon + valid auth returns 200 with full schema", async () => {
     const res = await api()
       .get(ENDPOINT)
@@ -54,7 +58,7 @@ describe("GET /v1/forecast - happy path", () => {
   });
 });
 
-describe("GET /v1/forecast - auth negative cases", () => {
+maybeDescribe("GET /v1/forecast - auth negative cases", () => {
   test("FC-010: missing Authorization header returns 401", async () => {
     const res = await api().get(ENDPOINT).query(VALID_PARAMS);
 
@@ -83,7 +87,7 @@ describe("GET /v1/forecast - auth negative cases", () => {
   });
 });
 
-describe("GET /v1/forecast - param negative cases", () => {
+maybeDescribe("GET /v1/forecast - param negative cases", () => {
   test("FC-020: missing lat returns 400", async () => {
     const res = await api()
       .get(ENDPOINT)
@@ -145,7 +149,7 @@ describe("GET /v1/forecast - param negative cases", () => {
   });
 });
 
-describe("GET /v1/forecast - boundary cases", () => {
+maybeDescribe("GET /v1/forecast - boundary cases", () => {
   test.each([
     ["north pole", 90, 0],
     ["south pole", -90, 0],
@@ -161,7 +165,7 @@ describe("GET /v1/forecast - boundary cases", () => {
   });
 });
 
-describe("GET /v1/forecast - consistency", () => {
+maybeDescribe("GET /v1/forecast - consistency", () => {
   test("FC-040: identical requests fired in quick succession return structurally consistent data", async () => {
     const [first, second] = await Promise.all([
       api().get(ENDPOINT).query({ ...VALID_PARAMS, ai: false }).set("Authorization", authHeader()),
@@ -174,7 +178,7 @@ describe("GET /v1/forecast - consistency", () => {
   });
 });
 
-describe("GET /v1/forecast - rate limiting", () => {
+maybeDescribe("GET /v1/forecast - rate limiting", () => {
   // Same rationale as weather.test.js: observe headers, don't exhaust the
   // Free tier's 1,000 req/month quota.
   test("FC-050: response includes well-formed X-RateLimit-* headers", async () => {
@@ -196,7 +200,7 @@ describe("GET /v1/forecast - rate limiting", () => {
   });
 });
 
-describe("GET /v1/forecast - error response quality", () => {
+maybeDescribe("GET /v1/forecast - error response quality", () => {
   test("FC-060: error responses are valid JSON with a consistent {error, message} shape", async () => {
     const res = await api().get(ENDPOINT).query(VALID_PARAMS); // 401: no auth
 
