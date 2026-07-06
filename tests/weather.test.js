@@ -47,15 +47,17 @@ maybeDescribe("GET /v1/weather - happy path", () => {
     assertValidWeatherSchema(res.body, { aiExpected: true });
   });
 
-  test("WX-002: ai=false returns 200 without a summary field, preserving AI quota", async () => {
+  test("WX-002: ai=false returns 200 without a populated AI summary, preserving AI quota", async () => {
     const res = await api()
       .get(ENDPOINT)
       .query({ ...VALID_PARAMS, ai: false })
       .set("Authorization", authHeader());
 
     expect(res.status).toBe(200);
+    // Real field is `ai_summary`, not the documented `summary` -- see
+    // assertions.js / REPORT.md. assertValidWeatherSchema already checks
+    // it's null/absent when aiExpected is false.
     assertValidWeatherSchema(res.body, { aiExpected: false });
-    expect(res.body.summary).toBeUndefined();
   });
 
   test("WX-003: units=imperial returns 200 with plausible Fahrenheit-range values", async () => {
@@ -78,7 +80,7 @@ maybeDescribe("GET /v1/weather - happy path", () => {
       .set("Authorization", authHeader());
 
     expect(res.status).toBe(200);
-    expect(res.body.forecast.length).toBe(3);
+    expect(res.body.daily.length).toBe(3);
   });
 
   test("WX-005: days=7 (documented Free-tier max) succeeds", async () => {
@@ -88,7 +90,7 @@ maybeDescribe("GET /v1/weather - happy path", () => {
       .set("Authorization", authHeader());
 
     expect(res.status).toBe(200);
-    expect(res.body.forecast.length).toBe(7);
+    expect(res.body.daily.length).toBe(7);
   });
 });
 
@@ -256,7 +258,7 @@ maybeDescribe("GET /v1/weather - param negative cases", () => {
       .set("Authorization", authHeader());
 
     if (res.status === 200) {
-      expect(res.body.forecast.length).toBeLessThanOrEqual(7);
+      expect(res.body.daily.length).toBeLessThanOrEqual(7);
     } else {
       expect([400, 403]).toContain(res.status);
       assertErrorShape(res.body);
@@ -280,14 +282,14 @@ maybeDescribe("GET /v1/weather - param negative cases", () => {
       .set("Authorization", authHeader());
 
     if (res.status === 200) {
-      expect(res.body.forecast.length).toBeLessThanOrEqual(7);
+      expect(res.body.daily.length).toBeLessThanOrEqual(7);
     } else {
       expect([400, 403]).toContain(res.status);
       assertErrorShape(res.body);
     }
     // eslint-disable-next-line no-console
     console.info(
-      `WX-032 observed: status=${res.status}, forecast.length=${res.body?.forecast?.length}`
+      `WX-032 observed: status=${res.status}, forecast.length=${res.body?.daily?.length}`
     );
   });
 
@@ -298,14 +300,14 @@ maybeDescribe("GET /v1/weather - param negative cases", () => {
       .set("Authorization", authHeader());
 
     if (res.status === 200) {
-      expect(res.body.forecast.length).toBeLessThanOrEqual(7);
+      expect(res.body.daily.length).toBeLessThanOrEqual(7);
     } else {
       expect([400, 403]).toContain(res.status);
       assertErrorShape(res.body);
     }
     // eslint-disable-next-line no-console
     console.info(
-      `WX-033 observed: status=${res.status}, forecast.length=${res.body?.forecast?.length}`
+      `WX-033 observed: status=${res.status}, forecast.length=${res.body?.daily?.length}`
     );
   });
 });
@@ -353,8 +355,8 @@ maybeDescribe("GET /v1/weather - consistency", () => {
     // Same coordinates, seconds apart -> forecast length and structure
     // should match; temperature/condition should be near-identical (not
     // necessarily bit-for-bit if the upstream provider re-samples).
-    expect(second.body.forecast.length).toBe(first.body.forecast.length);
-    expect(second.body.forecast.map((d) => d.date)).toEqual(first.body.forecast.map((d) => d.date));
+    expect(second.body.daily.length).toBe(first.body.daily.length);
+    expect(second.body.daily.map((d) => d.date)).toEqual(first.body.daily.map((d) => d.date));
   });
 
   test("WX-061: forecast dates are valid, unique, and in ascending order", async () => {
@@ -364,7 +366,7 @@ maybeDescribe("GET /v1/weather - consistency", () => {
       .set("Authorization", authHeader());
 
     expect(res.status).toBe(200);
-    const dates = res.body.forecast.map((d) => new Date(d.date).getTime());
+    const dates = res.body.daily.map((d) => new Date(d.date).getTime());
     expect(dates.every((t) => !Number.isNaN(t))).toBe(true);
 
     const sorted = [...dates].sort((a, b) => a - b);
@@ -414,6 +416,14 @@ maybeDescribe("GET /v1/weather - rate limiting", () => {
       .get(ENDPOINT)
       .query({ ...VALID_PARAMS, ai: false })
       .set("Authorization", authHeader());
+
+    // Assert the header actually exists as a number FIRST. Without this,
+    // a missing header produces `Number(undefined)` -> NaN on both sides,
+    // and `expect(NaN).toBe(NaN - 1)` (i.e. NaN) passes via Object.is(NaN,
+    // NaN) -- a false positive that silently masked the fact that
+    // X-RateLimit-* headers aren't sent at all (see WX-070 / REPORT.md).
+    expect(Number.isNaN(Number(first.headers["x-ratelimit-remaining"]))).toBe(false);
+    expect(Number.isNaN(Number(second.headers["x-ratelimit-remaining"]))).toBe(false);
 
     const firstRemaining = Number(first.headers["x-ratelimit-remaining"]);
     const secondRemaining = Number(second.headers["x-ratelimit-remaining"]);

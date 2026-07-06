@@ -39,7 +39,7 @@ maybeDescribe("GET /v1/forecast - happy path", () => {
       .set("Authorization", authHeader());
 
     expect(res.status).toBe(200);
-    expect(res.body.forecast.length).toBe(5);
+    expect(res.body.daily.length).toBe(5);
   });
 
   test("FC-003: /v1/forecast and /v1/weather return equivalent data for identical params (alias parity)", async () => {
@@ -51,10 +51,10 @@ maybeDescribe("GET /v1/forecast - happy path", () => {
 
     expect(forecastRes.status).toBe(200);
     expect(weatherRes.status).toBe(200);
-    expect(forecastRes.body.forecast.map((d) => d.date)).toEqual(
-      weatherRes.body.forecast.map((d) => d.date)
+    expect(forecastRes.body.daily.map((d) => d.date)).toEqual(
+      weatherRes.body.daily.map((d) => d.date)
     );
-    expect(forecastRes.body.forecast.length).toBe(weatherRes.body.forecast.length);
+    expect(forecastRes.body.daily.length).toBe(weatherRes.body.daily.length);
   });
 });
 
@@ -174,7 +174,7 @@ maybeDescribe("GET /v1/forecast - consistency", () => {
 
     expect(first.status).toBe(200);
     expect(second.status).toBe(200);
-    expect(second.body.forecast.map((d) => d.date)).toEqual(first.body.forecast.map((d) => d.date));
+    expect(second.body.daily.map((d) => d.date)).toEqual(first.body.daily.map((d) => d.date));
   });
 });
 

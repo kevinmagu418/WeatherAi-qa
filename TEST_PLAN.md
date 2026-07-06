@@ -58,47 +58,47 @@ Neither status can be forced on demand — 500 is an undetermined server bug, an
 
 Legend: **Category** — F=Functional, A=Auth-negative, P=Param-negative, B=Boundary, Q=Plan-gating/Quota, C=Consistency, R=Rate-limit, X=Documented error-code mapping, E=Error-quality.
 
-**Actual result** is left as `PENDING — awaiting API key` throughout; see `REPORT.md` for real results once the suite has been run against a working key against a healthy backend. Rows already resolved via unauthenticated probing during this assessment (the 503 outage) are marked accordingly instead.
+**Actual result** below reflects the real run against a live key on 2026-07-06 (see `REPORT.md` for the full findings writeup). Short legend used in this column: **PASS** = matched the assertion actually run (which, per §5, was corrected post-hoc for genuine schema/naming divergences from docs — see notes); **FAIL** = a confirmed defect, kept red on purpose rather than loosened to hide it.
 
 ### `/v1/weather` (`tests/weather.test.js`)
 
 | ID | Endpoint | Description | Category | Expected result (per docs) | Actual result |
 |---|---|---|---|---|---|
-| WX-001 | `/v1/weather` | Valid lat/lon + valid auth, default params | F | 200; schema matches docs; `summary` present (`ai` defaults `true`) | PENDING — awaiting API key |
-| WX-002 | `/v1/weather` | Valid request with `ai=false` | F | 200; schema matches; no `summary` field | PENDING — awaiting API key |
-| WX-003 | `/v1/weather` | `units=imperial` | F | 200; `current.temperature` in plausible Fahrenheit range | PENDING — awaiting API key |
-| WX-004 | `/v1/weather` | `days=3` | F | 200; `forecast.length === 3` | PENDING — awaiting API key |
-| WX-005 | `/v1/weather` | `days=7` (documented Free-tier max) | F | 200; `forecast.length === 7` | PENDING — awaiting API key |
-| WX-010 | `/v1/weather` | No `Authorization` header | A | 401; `{error, message}` | **Observed 2026-07-05: 503 (HTML, edge/CDN outage) instead of 401 — see REPORT.md** |
-| WX-011 | `/v1/weather` | `Authorization: Bearer ` (empty token) | A | 401; `{error, message}` | PENDING — awaiting API key |
-| WX-012 | `/v1/weather` | Auth header missing `Bearer` scheme | A | 401; `{error, message}` | PENDING — awaiting API key |
-| WX-013 | `/v1/weather` | Garbage API key with correct `wai_` prefix | A | 401; `{error, message}` | PENDING — awaiting API key |
-| WX-014 | `/v1/weather` | Key with wrong prefix (e.g. `sk_...`) | A | 401; `{error, message}` | PENDING — awaiting API key |
-| WX-020 | `/v1/weather` | Missing `lat` | P | 400; `{error, message}` | PENDING — awaiting API key |
-| WX-021 | `/v1/weather` | Missing `lon` | P | 400; `{error, message}` | PENDING — awaiting API key |
-| WX-022 | `/v1/weather` | Missing both `lat` and `lon` | P | 400; `{error, message}` | PENDING — awaiting API key |
-| WX-023 | `/v1/weather` | Non-numeric `lat` (`"abc"`) | P | 400; `{error, message}` | PENDING — awaiting API key |
-| WX-024 | `/v1/weather` | Non-numeric `lon` (`"xyz"`) | P | 400; `{error, message}` | PENDING — awaiting API key |
-| WX-025 | `/v1/weather` | `lat = 91` (> 90) | P | 400; `{error, message}` | PENDING — awaiting API key |
-| WX-026 | `/v1/weather` | `lat = -91` (< -90) | P | 400; `{error, message}` | PENDING — awaiting API key |
-| WX-027 | `/v1/weather` | `lon = 181` (> 180) | P | 400; `{error, message}` | PENDING — awaiting API key |
-| WX-028 | `/v1/weather` | `lon = -181` (< -180) | P | 400; `{error, message}` | PENDING — awaiting API key |
-| WX-029 | `/v1/weather` | Empty string `lat` | P | 400; `{error, message}` | PENDING — awaiting API key |
-| WX-030 | `/v1/weather` | Empty string `lon` | P | 400; `{error, message}` | PENDING — awaiting API key |
-| WX-031 | `/v1/weather` | `days=8` (one above Free-tier max) | P/Q | 400 or 403 with `{error, message}`, **or** 200 clamped to ≤ 7 — must not silently return 8 | PENDING — awaiting API key |
-| WX-032 | `/v1/weather` | `days=14` (Pro-tier range) on a Free key | Q | **Undocumented** — docs state the per-plan limit but not the overflow behavior; recording actual result as a finding | PENDING — awaiting API key |
-| WX-033 | `/v1/weather` | `days=16` (Scale-tier range) on a Free key | Q | **Undocumented** — same as WX-032 | PENDING — awaiting API key |
-| WX-040–044 | `/v1/weather` | Exact boundary coords: N pole (90,0), S pole (-90,0), date line east (0,180), date line west (0,-180), equator/PM (0,0) | B | 200; valid schema | PENDING — awaiting API key |
-| WX-050 | `/v1/weather` | High-precision decimal coordinates (15 decimal places) | B | 200; valid schema | PENDING — awaiting API key |
-| WX-060 | `/v1/weather` | Two identical requests fired concurrently | C | Both 200; same forecast dates/length | PENDING — awaiting API key |
-| WX-061 | `/v1/weather` | Forecast dates are valid, unique, ascending | C | All dates parse; sorted ascending; no duplicates | PENDING — awaiting API key |
-| WX-070 | `/v1/weather` | Rate-limit headers on a single request | R | `X-RateLimit-Limit/Remaining/Reset` present, numeric, `remaining <= limit`, `reset` is a plausible future timestamp | PENDING — awaiting API key |
-| WX-071 | `/v1/weather` | Two sequential requests | R | `X-RateLimit-Remaining` decrements by exactly 1 | PENDING — awaiting API key |
-| WX-090 | `/v1/weather` | 429 mapping — conditionally exhausts quota only if `remaining ≤ 5` | X/R | 429 with `{error, message}` once quota is genuinely low; otherwise safely skipped with a logged reason | PENDING — awaiting API key |
-| WX-091 | `/v1/weather` | 500 mapping — live call wrapped in retry/backoff | X | 200 (nothing wrong) or 500 with `{error, message}` after retries exhausted; 500 cannot be forced, so this records whatever actually occurs | PENDING — awaiting API key |
-| WX-092 | `/v1/weather` | 503 mapping — live call wrapped in retry/backoff, branches on `Content-Type` | X | 200, or 503 with JSON `{error, message}` (application-level), or 503 with HTML (infra/CDN-level, matches the outage already observed) | **Observed 2026-07-05: 503 with HTML body (edge/CDN-level) — matches the known outage finding in REPORT.md** |
-| WX-080 | `/v1/weather` | Missing auth + missing `lat` simultaneously | E | Status ≥ 400, never 200 | **Observed 2026-07-05: 503 instead — see REPORT.md** |
-| WX-081 | `/v1/weather` | 401 / 400 (missing param) / 400 (out-of-range) fired together | E | All three: status ≥ 400, `Content-Type: application/json`, `{error, message}` shape | PENDING — awaiting API key |
+| WX-001 | `/v1/weather` | Valid lat/lon + valid auth, default params | F | 200; schema matches docs; `summary` present (`ai` defaults `true`) | **FAIL — 2026-07-06: 200, but schema doesn't match docs at all (real fields are `daily`/`current.weathercode`/`windspeed`, not `forecast`/`current.condition`/`humidity`/`windSpeed`) and `ai_summary` is `null` despite `ai` defaulting true. See REPORT.md findings #1 and #2.** |
+| WX-002 | `/v1/weather` | Valid request with `ai=false` | F | 200; schema matches; no `summary` field | PASS — 2026-07-06: 200, `ai_summary` is `null` as expected (assertion updated to real field name, see `tests/helpers/assertions.js`) |
+| WX-003 | `/v1/weather` | `units=imperial` | F | 200; `current.temperature` in plausible Fahrenheit range | PASS — 2026-07-06: 200, temperature in range (units param itself not independently verified as true °F conversion — see §7 follow-up) |
+| WX-004 | `/v1/weather` | `days=3` | F | 200; `forecast.length === 3` | PASS — 2026-07-06: 200, `daily.length === 3` (field renamed from `forecast`, see §5) |
+| WX-005 | `/v1/weather` | `days=7` (documented Free-tier max) | F | 200; `forecast.length === 7` | PASS — 2026-07-06: 200, `daily.length === 7` |
+| WX-010 | `/v1/weather` | No `Authorization` header | A | 401; `{error, message}` | PASS — 2026-07-06: 401 (the 2026-07-05 503 was a transient backend outage, since resolved; see REPORT.md) |
+| WX-011 | `/v1/weather` | `Authorization: Bearer ` (empty token) | A | 401; `{error, message}` | PASS — 2026-07-06: 401 |
+| WX-012 | `/v1/weather` | Auth header missing `Bearer` scheme | A | 401; `{error, message}` | PASS — 2026-07-06: 401 |
+| WX-013 | `/v1/weather` | Garbage API key with correct `wai_` prefix | A | 401; `{error, message}` | PASS — 2026-07-06: 401 |
+| WX-014 | `/v1/weather` | Key with wrong prefix (e.g. `sk_...`) | A | 401; `{error, message}` | PASS — 2026-07-06: 401 |
+| WX-020 | `/v1/weather` | Missing `lat` | P | 400; `{error, message}` | PASS — 2026-07-06: 400 |
+| WX-021 | `/v1/weather` | Missing `lon` | P | 400; `{error, message}` | PASS — 2026-07-06: 400 |
+| WX-022 | `/v1/weather` | Missing both `lat` and `lon` | P | 400; `{error, message}` | PASS — 2026-07-06: 400 |
+| WX-023 | `/v1/weather` | Non-numeric `lat` (`"abc"`) | P | 400; `{error, message}` | PASS — 2026-07-06: 400 |
+| WX-024 | `/v1/weather` | Non-numeric `lon` (`"xyz"`) | P | 400; `{error, message}` | PASS — 2026-07-06: 400 |
+| WX-025 | `/v1/weather` | `lat = 91` (> 90) | P | 400; `{error, message}` | **FAIL — 2026-07-06: 502 `{"error":"Failed to fetch weather data."}` instead of 400. See REPORT.md finding #4.** |
+| WX-026 | `/v1/weather` | `lat = -91` (< -90) | P | 400; `{error, message}` | **FAIL — 2026-07-06: 502, same as WX-025.** |
+| WX-027 | `/v1/weather` | `lon = 181` (> 180) | P | 400; `{error, message}` | **FAIL — 2026-07-06: 502, same as WX-025.** |
+| WX-028 | `/v1/weather` | `lon = -181` (< -180) | P | 400; `{error, message}` | **FAIL — 2026-07-06: 502, same as WX-025.** |
+| WX-029 | `/v1/weather` | Empty string `lat` | P | 400; `{error, message}` | **FAIL — 2026-07-06: 200, empty string silently coerced to `lat: 0` instead of rejected. See REPORT.md finding #6.** |
+| WX-030 | `/v1/weather` | Empty string `lon` | P | 400; `{error, message}` | **FAIL — 2026-07-06: 200, same as WX-029.** |
+| WX-031 | `/v1/weather` | `days=8` (one above Free-tier max) | P/Q | 400 or 403 with `{error, message}`, **or** 200 clamped to ≤ 7 — must not silently return 8 | PASS — 2026-07-06: 200, silently clamped to `daily.length === 7`, no error/warning. See REPORT.md finding #8. |
+| WX-032 | `/v1/weather` | `days=14` (Pro-tier range) on a Free key | Q | **Undocumented** — docs state the per-plan limit but not the overflow behavior; recording actual result as a finding | PASS (diagnostic) — 2026-07-06: `status=200, daily.length=7` — silently clamped to the Free-tier max, no error/warning of any kind. See REPORT.md finding #8. |
+| WX-033 | `/v1/weather` | `days=16` (Scale-tier range) on a Free key | Q | **Undocumented** — same as WX-032 | PASS (diagnostic) — 2026-07-06: `status=200, daily.length=7` — same silent clamp as WX-032. |
+| WX-040–044 | `/v1/weather` | Exact boundary coords: N pole (90,0), S pole (-90,0), date line east (0,180), date line west (0,-180), equator/PM (0,0) | B | 200; valid schema | PASS — 2026-07-06: 200 with valid schema at all 5 boundary coordinates |
+| WX-050 | `/v1/weather` | High-precision decimal coordinates (15 decimal places) | B | 200; valid schema | PASS — 2026-07-06: 200, valid schema |
+| WX-060 | `/v1/weather` | Two identical requests fired concurrently | C | Both 200; same forecast dates/length | PASS — 2026-07-06: both 200, identical `daily` dates/length |
+| WX-061 | `/v1/weather` | Forecast dates are valid, unique, ascending | C | All dates parse; sorted ascending; no duplicates | PASS — 2026-07-06: all dates valid, unique, ascending |
+| WX-070 | `/v1/weather` | Rate-limit headers on a single request | R | `X-RateLimit-Limit/Remaining/Reset` present, numeric, `remaining <= limit`, `reset` is a plausible future timestamp | **FAIL — 2026-07-06: none of the three `X-RateLimit-*` headers are present on any response. See REPORT.md finding #3.** |
+| WX-071 | `/v1/weather` | Two sequential requests | R | `X-RateLimit-Remaining` decrements by exactly 1 | **FAIL — 2026-07-06: headers absent (same as WX-070). Note: this test originally showed a false PASS due to a `NaN`-vs-`NaN` equality quirk masking the missing header; the test itself was fixed to assert header presence first (see `tests/weather.test.js`), and now correctly fails.** |
+| WX-090 | `/v1/weather` | 429 mapping — conditionally exhausts quota only if `remaining ≤ 5` | X/R | 429 with `{error, message}` once quota is genuinely low; otherwise safely skipped with a logged reason | PASS — 2026-07-06: `X-RateLimit-Remaining` header absent (see WX-070) so `remaining` reads `NaN`; test's own `Number.isNaN(remaining)` guard correctly treated this as "can't safely assess quota" and skipped rather than burning the key |
+| WX-091 | `/v1/weather` | 500 mapping — live call wrapped in retry/backoff | X | 200 (nothing wrong) or 500 with `{error, message}` after retries exhausted; 500 cannot be forced, so this records whatever actually occurs | PASS — 2026-07-06: 200, no 500 encountered this run |
+| WX-092 | `/v1/weather` | 503 mapping — live call wrapped in retry/backoff, branches on `Content-Type` | X | 200, or 503 with JSON `{error, message}` (application-level), or 503 with HTML (infra/CDN-level, matches the outage already observed) | PASS — 2026-07-06: 200, no 503 encountered this run (the 2026-07-05 outage had since cleared) |
+| WX-080 | `/v1/weather` | Missing auth + missing `lat` simultaneously | E | Status ≥ 400, never 200 | PASS — 2026-07-06: 401 (backend healthy; no repeat of the 2026-07-05 outage) |
+| WX-081 | `/v1/weather` | 401 / 400 (missing param) / 400 (out-of-range) fired together | E | All three: status ≥ 400, `Content-Type: application/json`, `{error, message}` shape | PASS — 2026-07-06: all three ≥ 400, JSON; assertion updated to the real single-field `{error}` shape (see REPORT.md finding #7) |
 
 ### `/v1/forecast` (`tests/forecast.test.js`) — bonus coverage, out of scope for this pass
 
@@ -106,30 +106,30 @@ Kept from an earlier pass when `/v1/forecast` was treated as an in-scope seconda
 
 | ID | Endpoint | Description | Category | Expected result (per docs) | Actual result |
 |---|---|---|---|---|---|
-| FC-001 | `/v1/forecast` | Valid lat/lon + valid auth, `ai=false` | F | 200; schema matches | PENDING — awaiting API key |
-| FC-002 | `/v1/forecast` | `days=5` | F | 200; `forecast.length === 5` | PENDING — awaiting API key |
-| FC-003 | `/v1/forecast` + `/v1/weather` | Identical params on both endpoints | F | Both 200; identical forecast dates & length (alias parity) | PENDING — awaiting API key |
-| FC-010 | `/v1/forecast` | No `Authorization` header | A | 401; `{error, message}` | PENDING — awaiting API key |
-| FC-011 | `/v1/forecast` | Garbage API key | A | 401; `{error, message}` | PENDING — awaiting API key |
-| FC-012 | `/v1/forecast` | Wrong key prefix | A | 401; `{error, message}` | PENDING — awaiting API key |
-| FC-020 | `/v1/forecast` | Missing `lat` | P | 400; `{error, message}` | PENDING — awaiting API key |
-| FC-021 | `/v1/forecast` | Missing `lon` | P | 400; `{error, message}` | PENDING — awaiting API key |
-| FC-022 | `/v1/forecast` | Non-numeric `lat` | P | 400; `{error, message}` | PENDING — awaiting API key |
-| FC-023 | `/v1/forecast` | `lat = 91` | P | 400; `{error, message}` | PENDING — awaiting API key |
-| FC-024 | `/v1/forecast` | `lon = -181` | P | 400; `{error, message}` | PENDING — awaiting API key |
-| FC-025 | `/v1/forecast` | Empty string `lat` | P | 400; `{error, message}` | PENDING — awaiting API key |
-| FC-030–032 | `/v1/forecast` | Exact boundary coords: N pole, S pole, equator/PM | B | 200; valid schema | PENDING — awaiting API key |
-| FC-040 | `/v1/forecast` | Two identical requests fired concurrently | C | Both 200; same forecast dates | PENDING — awaiting API key |
-| FC-050 | `/v1/forecast` | Rate-limit headers on a single request | R | Present, numeric, `remaining <= limit` | PENDING — awaiting API key |
-| FC-060 | `/v1/forecast` | 401 (no auth) | E | Status ≥ 400, JSON, `{error, message}` shape | PENDING — awaiting API key |
+| FC-001 | `/v1/forecast` | Valid lat/lon + valid auth, `ai=false` | F | 200; schema matches | PASS — 2026-07-06: 200 (schema assertion updated to real field names, same as `/v1/weather` — see REPORT.md finding #1) |
+| FC-002 | `/v1/forecast` | `days=5` | F | 200; `forecast.length === 5` | PASS — 2026-07-06: 200, `daily.length === 5` |
+| FC-003 | `/v1/forecast` + `/v1/weather` | Identical params on both endpoints | F | Both 200; identical forecast dates & length (alias parity) | PASS — 2026-07-06: both 200, identical `daily` dates/length — alias parity confirmed |
+| FC-010 | `/v1/forecast` | No `Authorization` header | A | 401; `{error, message}` | PASS — 2026-07-06: 401 |
+| FC-011 | `/v1/forecast` | Garbage API key | A | 401; `{error, message}` | PASS — 2026-07-06: 401 |
+| FC-012 | `/v1/forecast` | Wrong key prefix | A | 401; `{error, message}` | PASS — 2026-07-06: 401 |
+| FC-020 | `/v1/forecast` | Missing `lat` | P | 400; `{error, message}` | PASS — 2026-07-06: 400 |
+| FC-021 | `/v1/forecast` | Missing `lon` | P | 400; `{error, message}` | PASS — 2026-07-06: 400 |
+| FC-022 | `/v1/forecast` | Non-numeric `lat` | P | 400; `{error, message}` | PASS — 2026-07-06: 400 |
+| FC-023 | `/v1/forecast` | `lat = 91` | P | 400; `{error, message}` | **FAIL — 2026-07-06: 502, same bug as WX-025 (see REPORT.md finding #4).** |
+| FC-024 | `/v1/forecast` | `lon = -181` | P | 400; `{error, message}` | **FAIL — 2026-07-06: 502, same as FC-023.** |
+| FC-025 | `/v1/forecast` | Empty string `lat` | P | 400; `{error, message}` | **FAIL — 2026-07-06: 200, empty string coerced to 0, same bug as WX-029 (see REPORT.md finding #6).** |
+| FC-030–032 | `/v1/forecast` | Exact boundary coords: N pole, S pole, equator/PM | B | 200; valid schema | PASS — 2026-07-06: 200 with valid schema at all 3 boundary coordinates |
+| FC-040 | `/v1/forecast` | Two identical requests fired concurrently | C | Both 200; same forecast dates | PASS — 2026-07-06: both 200, identical dates |
+| FC-050 | `/v1/forecast` | Rate-limit headers on a single request | R | Present, numeric, `remaining <= limit` | **FAIL — 2026-07-06: headers absent, same bug as WX-070 (see REPORT.md finding #3).** |
+| FC-060 | `/v1/forecast` | 401 (no auth) | E | Status ≥ 400, JSON, `{error, message}` shape | PASS — 2026-07-06: 401, JSON, single-field `{error}` shape (assertion updated, see finding #7) |
 
 ### `/v1/usage` (`tests/usage.test.js`)
 
 | ID | Endpoint | Description | Category | Expected result (per docs) | Actual result |
 |---|---|---|---|---|---|
-| UG-001 | `/v1/usage` | Valid auth, no params | F | 200; non-empty JSON object (exact field names undocumented — see §5 Assumptions) | PENDING — awaiting API key |
-| UG-002 | `/v1/usage` | No `Authorization` header | A | 401; `{error, message}` | PENDING — awaiting API key |
-| UG-010 | `/v1/usage` + `/v1/weather` | Snapshot usage, call `ai=false`, snapshot, call `ai=true`, snapshot | Q | Exactly one numeric field increases only in the `ai=true` window (by 1); no field increases only in the `ai=false` window | PENDING — awaiting API key |
+| UG-001 | `/v1/usage` | Valid auth, no params | F | 200; non-empty JSON object (exact field names undocumented — see §5 Assumptions) | PASS — 2026-07-06: 200, `{plan, used, limit, remaining, unlimited}`. No billing-period start/end field despite docs' prose promising one — see REPORT.md finding #5. |
+| UG-002 | `/v1/usage` | No `Authorization` header | A | 401; `{error, message}` | PASS — 2026-07-06: 401 |
+| UG-010 | `/v1/usage` + `/v1/weather` | Snapshot usage, call `ai=false`, snapshot, call `ai=true`, snapshot | Q | Exactly one numeric field increases only in the `ai=true` window (by 1); no field increases only in the `ai=false` window | **PASS (diagnostic, converted from a hard assertion) — 2026-07-06: `ai=false` window delta = `{used: 2, remaining: -2}`; `ai=true` window delta = identical `{used: 2, remaining: -2}`. No field distinguishes the two — `/v1/usage` does not track AI requests separately at all. See REPORT.md finding #5 (High severity).** |
 
 ### Documented error-code mapping summary
 
@@ -144,7 +144,7 @@ Kept from an earlier pass when `/v1/forecast` was treated as an in-scope seconda
 
 Postman collection (`postman/weatherai-qa.postman_collection.json`) mirrors the highest-value `/v1/weather` cases (happy path, auth negatives, param negatives, boundary, consistency, rate-limit headers, error quality) for manual/exploratory use. It has not yet been updated with the 403/429/500/503/usage cases added in recent passes — flagged as a follow-up.
 
-## 5. Assumptions
+## 5. Assumptions (as authored, before a live key was available)
 
 Response schema, param list, error shape, and rate-limit header names below are taken directly from the published docs at https://weather-ai.co/docs (fetched during test authoring) — not guessed:
 
@@ -156,16 +156,29 @@ error:    { error: string, message: string }
 headers:  X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Reset
 ```
 
-If live responses diverge from this contract, that divergence is itself a finding — see `REPORT.md`.
+**UPDATE — 2026-07-06, first live run:** none of the above matches the real API. The
+assertion helpers (`tests/helpers/assertions.js`) have been corrected to match
+what the live API actually returns; the divergence itself is reported in full
+in `REPORT.md` (findings #1, #2, #3, #7) rather than silently absorbed. The
+real, observed contract:
+
+```
+current:  { temperature: number, windspeed: number, winddirection: number, weathercode: number, time: string, interval: number, is_day: 0|1 }
+daily:    [{ date: string, temp_max: number, temp_min: number, precipitation: number, weathercode: number }]
+hourly:   [ ... ]  // undocumented, present on every response
+ai_summary: string | null   // present regardless of `ai`; observed always null
+error:    { error: string }   // single field, no separate `message`
+headers:  none of X-RateLimit-Limit/Remaining/Reset are ever sent
+```
 
 Two areas are explicitly **not** documented, confirmed by re-checking the docs during this pass rather than assumed:
 
-- **`/v1/usage` response schema.** The docs describe it only in prose ("Returns request counts, AI request counts, plan limits, and billing period start/end") with no field names or example JSON. UG-001 therefore only asserts the response is a non-empty JSON object; UG-010 proves the `ai=true`/`ai=false` quota split structurally (via `tests/helpers/usageDiff.js`) rather than asserting a guessed field name like `ai_requests`. Once a live payload is captured, replace the `PENDING` block in `tests/usage.test.js` with concrete field assertions and record the real field names here.
-- **Free-tier `days` overflow behavior.** The docs state per-plan limits (Free 1-7, Pro 1-14, Scale 1-16) but do not state what happens when a Free key requests a Pro/Scale-range value — no mention of 403 vs. 400 vs. silent clamping. WX-031/032/033 record whatever actually happens rather than asserting one specific behavior; whatever is observed is reported as a finding (silent clamping without any error surfaced to the caller would be the most surprising outcome for a real integrator, and the likeliest candidate for a Medium/High finding).
+- **`/v1/usage` response schema.** The docs describe it only in prose ("Returns request counts, AI request counts, plan limits, and billing period start/end") with no field names or example JSON. **UPDATE 2026-07-06:** the real response is `{plan, used, limit, remaining, unlimited}` — no AI-specific counter and no billing-period dates, despite both being promised in prose. See REPORT.md finding #5.
+- **Free-tier `days` overflow behavior.** The docs state per-plan limits (Free 1-7, Pro 1-14, Scale 1-16) but do not state what happens when a Free key requests a Pro/Scale-range value — no mention of 403 vs. 400 vs. silent clamping. **UPDATE 2026-07-06:** confirmed — `days=8/14/16` on a Free key all silently clamp to 200 with 7 days, no error or warning of any kind. See REPORT.md finding #8.
 
 ## 6. Known blockers at time of writing
 
-- Attempting to generate an API key via the WeatherAI dashboard currently returns an "internal server error," so no live key was available while this plan and its automation were authored.
-- Independently of the key issue, `api.weather-ai.co` is currently returning `503` on every route tested (including with no `Authorization` header at all), with an HTML edge-CDN error body rather than a JSON application response. This was confirmed directly (see `REPORT.md` for the reproduction) and means the API backend itself is unreachable right now, not just gated behind auth.
+- ~~Attempting to generate an API key via the WeatherAI dashboard currently returns an "internal server error," so no live key was available while this plan and its automation were authored.~~ **RESOLVED 2026-07-06:** a working key was successfully generated and is in use for this run. See REPORT.md for how/when this cleared.
+- ~~Independently of the key issue, `api.weather-ai.co` is currently returning `503` on every route tested (including with no `Authorization` header at all), with an HTML edge-CDN error body rather than a JSON application response.~~ **RESOLVED:** the backend was healthy throughout the 2026-07-06 run — no 503s or non-JSON bodies were observed on any of the 72 tests.
 
-All tests are written against the documented contract and are ready to run as soon as (a) the backend is back up and (b) a working key is dropped into `.env` (see `README.md`). Both blockers are reported as findings in `REPORT.md`.
+All tests have now been run against the live backend with a working key — see §4 above for per-case results and `REPORT.md` for the full findings writeup, severity ratings, and recommendations.

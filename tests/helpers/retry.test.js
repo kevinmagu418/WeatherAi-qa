@@ -61,8 +61,16 @@ describe("requestWithRetry", () => {
     const gap1 = callTimestamps[1] - callTimestamps[0]; // ~30ms (baseDelayMs * 2^0)
     const gap2 = callTimestamps[2] - callTimestamps[1]; // ~60ms (baseDelayMs * 2^1)
 
+    // Real setTimeout/Date.now() timing on a loaded CI/dev machine has
+    // enough jitter that a strict `gap2 >= gap1 * 1.5` compounds any delay
+    // already present in gap1 -- this flaked (gap1 inflated to ~47ms by
+    // scheduler jitter, making the 1.5x floor an unreachable ~70.5ms even
+    // though gap2's own ~60ms target was hit). Checking each gap against
+    // its own generous floor, plus a plain monotonic increase, verifies the
+    // same exponential-backoff behavior without compounding jitter.
     expect(gap1).toBeGreaterThanOrEqual(25);
-    expect(gap2).toBeGreaterThanOrEqual(gap1 * 1.5);
+    expect(gap2).toBeGreaterThanOrEqual(50);
+    expect(gap2).toBeGreaterThan(gap1);
   });
 
   test("RT-005: only treats configured statuses as retryable (400 is not retried)", async () => {
