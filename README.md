@@ -8,7 +8,7 @@ see `TEST_PLAN.md` § "Out of scope" for why it's now a bonus/stretch item
 rather than required scope.
 
 - **`TEST_PLAN.md`** — scope, testing types, tools, and the full test case list.
-- **`REPORT.md`** — findings and recommendations from the live test run (see status note at the top of that file).
+- **`REPORT.md`** — findings, severity ratings, and recommendations from the live test run against a real API key.
 - **`tests/`** — Jest + Supertest automated suite, run against the real API (no mocking, no localhost).
 - **`postman/`** — Postman collection mirroring the same test categories for manual/exploratory use.
 
@@ -44,8 +44,9 @@ npm run test:forecast # /v1/forecast only -- bonus coverage, not required this p
 
 Tests hit the live API at `https://api.weather-ai.co` (override with
 `WEATHERAI_BASE_URL` in `.env` if needed, e.g. for a staging environment).
-No key = the suite fails fast with a clear error telling you to set one,
-rather than a wall of confusing 401s. The `test:unit` tests are the
+No key = every live-API describe block is skipped (not failed) with a single
+console warning telling you to set one — so `npm test` stays green rather
+than showing a wall of confusing 401s. The `test:unit` tests are the
 exception — they exercise internal helpers (retry/backoff, usage-quota
 diffing) with mocked data and need no key or network access.
 
@@ -57,6 +58,14 @@ diffing) with mocked data and need no key or network access.
    commit a real key into the collection file itself.
 3. Run individual requests, or use the Collection Runner to execute a folder
    (Happy Path, Auth Negative Cases, etc.) in sequence.
+
+Alternatively, run it headlessly via [Newman](https://github.com/postmanlabs/newman)
+(not a project dependency — invoke it ad hoc):
+
+```bash
+npx newman run postman/weatherai-qa.postman_collection.json \
+  -e <(node -e "require('dotenv').config();console.log(JSON.stringify({values:[{key:'api_key',value:process.env.WEATHERAI_API_KEY.trim(),enabled:true},{key:'base_url',value:'https://api.weather-ai.co',enabled:true}]}))")
+```
 
 ## A note on API quota
 
